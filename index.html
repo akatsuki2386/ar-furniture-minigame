@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>AR家具配置ミニゲーム</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        /* CSSは変更なしのため省略 */
+        body { margin: 0; background-color: #1A202C; color: white; font-family: sans-serif; overflow: hidden; }
+        canvas { display: block; }
+        #title-container { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 5; width: 90%; }
+        #title-container h1 { font-size: 2.2rem; font-weight: bold; line-height: 1.4; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+        #ios-ar-container { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 5; width: 90%; }
+        #ios-ar-links { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; align-items: center; }
+        #ios-ar-links a { display: block; padding: 14px 24px; background-color: rgba(255, 255, 255, 0.2); color: white; text-decoration: none; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.3); font-weight: bold; font-size: 16px; min-width: 220px; box-sizing: border-box; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        #ARButton { color: white !important; background-color: rgba(255, 255, 255, 0.2) !important; border: 1px solid rgba(255, 255, 255, 0.3) !important; backdrop-filter: blur(10px) !important; -webkit-backdrop-filter: blur(10px) !important; border-radius: 9999px !important; font-size: 16px !important; font-weight: bold !important; padding: 14px 24px !important; min-width: 220px !important; box-shadow: none !important; opacity: 1 !important; position: absolute !important; bottom: 15% !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 100 !important; white-space: nowrap !important; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: auto; }
+        #instruction-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 16px; text-align: center; background-color: rgba(0, 0, 0, 0.6); padding: 20px 30px; border-radius: 15px; line-height: 1.7; display: none; pointer-events: none; min-width: 260px; box-sizing: border-box; }
+        #bottom-bar { position: absolute; bottom: 0; left: 0; width: 100%; height: 220px; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 80px; box-sizing: border-box; }
+        #transform-controls, #decision-controls { display: none; align-items: center; pointer-events: auto; width: 90%; max-width: 400px; justify-content: center; }
+        #transform-controls { gap: 15px; margin-bottom: 20px; }
+        #decision-controls { background-color: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 9999px; overflow: hidden; width: auto; }
+        #scale-slider-container { width: 50%; display: flex; align-items: center; justify-content: center; height: 48px; background-color: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 9999px; padding: 0 10px; }
+        .slider-icon { font-size: 24px; font-weight: bold; color: rgba(255, 255, 255, 0.7); padding: 0 8px; }
+        #slider-track { width: 100%; height: 6px; background-color: rgba(255, 255, 255, 0.3); border-radius: 3px; position: relative; }
+        #slider-handle { width: 32px; height: 32px; background-color: white; border-radius: 50%; position: absolute; top: 50%; transform: translateY(-50%); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s ease; }
+        .rotation-button-group { display: flex; background-color: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 9999px; overflow: hidden; }
+        .group-button { background: none; border: none; color: white; padding: 12px 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .group-button:active { background-color: rgba(255, 255, 255, 0.2); }
+        #delete-button, #confirm-button { padding: 16px 28px; }
+        #delete-button { border-right: 1px solid rgba(255, 255, 255, 0.3); }
+        #rotate-right-button { border-left: 1px solid rgba(255, 255, 255, 0.3); }
+        .rotation-button-group .group-button svg { transform: rotate(180deg); }
+        #add-button, #edit-button { position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); display: none; align-items: center; pointer-events: auto; }
+        .circle-button { width: 64px; height: 64px; background-color: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: white; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.1s ease, background-color 0.2s ease; pointer-events: auto; flex-shrink: 0; user-select: none; -webkit-user-select: none; }
+        #mode-switch-button { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 9999px; padding: 5px; font-size: 15px; cursor: pointer; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: none; align-items: center; gap: 5px; pointer-events: auto; white-space: nowrap; transition: opacity 0.2s ease; }
+        .mode-label { transition: all 0.3s ease-in-out; padding: 5px 15px; border-radius: 9999px; font-weight: normal; color: #a0aec0; background-color: transparent; }
+        .mode-label.active { font-weight: bold; color: #1A202C; background-color: white; }
+        #top-left-controls { position: absolute; top: 40px; left: 20px; z-index: 11; }
+        #top-right-controls { position: absolute; top: 40px; right: 20px; z-index: 11; }
+        .dialog-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 300; pointer-events: auto; }
+        .dialog-box { background-color: rgba(45, 55, 72, 0.9); padding: 25px 35px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.2); text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .dialog-box p { margin: 0 0 20px 0; font-size: 1.1rem; font-weight: bold; }
+        .dialog-buttons { display: flex; gap: 15px; justify-content: center; }
+        .dialog-buttons button { border: none; border-radius: 9999px; padding: 10px 24px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
+        #confirm-delete-no { background-color: rgba(255,255,255,0.2); color: white; }
+        #confirm-delete-yes { background-color: #E53E3E; color: white; }
+        #score-modal { display: none; }
+        #score-modal .dialog-box { min-width: 300px; }
+        #score-modal #score-details { margin: 25px 0; text-align: left; line-height: 2; font-size: 1rem; }
+        #score-modal #score-details strong { color: #63B3ED; }
+        #score-modal #total-score { font-size: 1.5rem; margin-bottom: 25px; }
+        #score-modal #retry-button { background-color: #4299E1; color: white; }
+        #score-modal #exit-game-button { background-color: rgba(255,255,255,0.2); color: white; }
+        /* 他のCSSルールは変更なし */
+    </style>
+</head>
+<body>
+    <div id="title-container">
+        <h1>AR家具配置<br>ミニゲーム</h1>
+    </div>
+
+    <div id="overlay">
+        <div id="instruction-text">
+            <span style="font-size: 1.25em; font-weight: bold;">床を認識中<span id="loading-dots"></span></span><br><br>
+            カメラをゆっくりと<br>床に向けて<br>動かしてください
+        </div>
+        
+        <div id="top-right-controls">
+             <button id="exit-ar-button" class="circle-button" style="display: none; width: 56px; height: 56px;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 28px; height: 28px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m-3-3-3-3m0 0 3-3m-3 3h12" />
+                </svg>
+            </button>
+        </div>
+        
+        <div id="bottom-bar">
+            <div id="transform-controls">
+                <div id="scale-slider-container">
+                    <span class="slider-icon">-</span>
+                    <div id="slider-track"><div id="slider-handle"></div></div>
+                    <span class="slider-icon">+</span>
+                </div>
+                <div class="rotation-button-group">
+                    <button id="rotate-left-button" class="group-button"></button>
+                    <button id="rotate-right-button" class="group-button"></button>
+                </div>
+            </div>
+            <div id="decision-controls">
+                <button id="confirm-button" class="group-button"></button>
+            </div>
+        </div>
+
+        <div id="score-modal" class="dialog-container">
+            <div class="dialog-box">
+                <p id="total-score">総合一致度: 100%</p>
+                <div id="score-details">
+                    <p>位置の近さ: <strong id="pos-score">100%</strong></p>
+                    <p>角度の近さ: <strong id="rot-score">100%</strong></p>
+                    <p>大きさの近さ: <strong id="scale-score">100%</strong></p>
+                </div>
+                <div class="dialog-buttons">
+                    <button id="exit-game-button">終了する</button>
+                    <button id="retry-button">リトライ</button>
+                </div>
+            </div>
+        </div>
+        </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // 元のJSコードをここにペーストし、以下の修正を加える
+        function main() {
+            setupWebXR();
+        }
+
+        function setupWebXR() {
+            let camera, scene, renderer;
+            let hitTestSource = null;
+            let hitTestSourceRequested = false;
+            let reticle;
+            const loader = new GLTFLoader();
+            const preloadedModels = new Map();
+            let floorY = null;
+            let dotAnimationTimer = null;
+            
+            // ▼▼▼ ゲーム用変数を追加 ▼▼▼
+            let gameState = 'IDLE'; // IDLE, READY, PLAYING, SCORED
+            let targetObject = null; // お題のモデル
+            let userObject = null;   // ユーザーが操作するモデル
+            // ▲▲▲ ゲーム用変数を追加 ▲▲▲
+
+            const furnitureData = [
+                { name: 'イス', file: 'chair.glb', height: 0.79 },
+                { name: '本棚', file: 'bookshelf.glb', height: 1.8 },
+                { name: '脚立', file: 'stand.glb', height: 1.2 },
+            ];
+            
+            const placedObjects = []; // ユーザーが操作可能なオブジェクトを管理
+            const raycaster = new THREE.Raycaster();
+            let isDraggingSlider = false;
+
+            const gestureState = {
+                touchCount: 0, initialDistance: 0.0, lastX: 0, isInteracting: false,
+                originalMultiplier: 1.0, startTime: 0, startX: 0, startY: 0,
+            };
+            
+            let isRotatingContinuously = false;
+            let continuousRotationDirection = 0;
+
+            init();
+
+            function preloadModels() {
+                const loadingPromises = furnitureData.map(item => {
+                    return new Promise((resolve, reject) => {
+                        loader.load(item.file, (gltf) => {
+                            preloadedModels.set(item.file, gltf);
+                            resolve();
+                        }, undefined, reject);
+                    });
+                });
+                Promise.all(loadingPromises)
+                    .then(() => console.log("すべてのモデルの事前読み込みが完了しました！"))
+                    .catch(error => console.error("モデルの事前読み込み中にエラーが発生しました。", error));
+            }
+
+            function init() {
+                scene = new THREE.Scene();
+                camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+                scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3));
+                
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.xr.enabled = true;
+                document.body.appendChild(renderer.domElement);
+
+                const overlay = document.getElementById('overlay');
+                overlay.addEventListener('touchstart', handleTouchStart, { passive: false });
+                overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
+                overlay.addEventListener('touchend', handleTouchEnd);
+                
+                document.getElementById('confirm-button').innerHTML = `採点する`;
+                document.getElementById('rotate-left-button').innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 28px; height: 28px;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>`;
+                document.getElementById('rotate-right-button').innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 28px; height: 28px;"><path stroke-linecap="round" stroke-linejoin="round" d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3" /></svg>`;
+                
+                const arButton = ARButton.createButton(renderer, {
+                    requiredFeatures: ['hit-test'],
+                    optionalFeatures: ['dom-overlay'],
+                    domOverlay: { root: document.querySelector("#overlay") }
+                });
+                arButton.textContent = "ゲームスタート"; // ボタンのテキストを変更
+                document.body.appendChild(arButton);
+                
+                renderer.xr.addEventListener('sessionstart', () => {
+                    document.getElementById('title-container').style.display = 'none';
+                    resetGame();
+                    initializeARExperience();
+                    preloadModels();
+                });
+
+                renderer.xr.addEventListener('sessionend', () => {
+                    document.getElementById('title-container').style.display = 'block';
+                    resetGame();
+                    document.getElementById('exit-ar-button').style.display = 'none';
+                    stopDotAnimation();
+                });
+                
+                animate();
+            }
+
+            function initializeARExperience() {
+                reticle = new THREE.Mesh(
+                    new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
+                    new THREE.MeshBasicMaterial()
+                );
+                reticle.matrixAutoUpdate = false;
+                reticle.visible = false;
+                scene.add(reticle);
+                setupUI();
+                gameState = 'READY';
+                updateUI();
+            }
+
+            // ▼▼▼ ゲームロジックの関数群 ▼▼▼
+
+            function resetGame() {
+                // シーンからオブジェクトを削除
+                if (targetObject) scene.remove(targetObject);
+                if (userObject) scene.remove(userObject);
+                targetObject = null;
+                userObject = null;
+                placedObjects.length = 0;
+
+                if(reticle) reticle.visible = false;
+                
+                gameState = 'IDLE';
+                floorY = null;
+                hitTestSource = null;
+                hitTestSourceRequested = false;
+
+                document.getElementById('score-modal').style.display = 'none';
+                updateUI();
+            }
+
+            function spawnTargetAndUserObjects() {
+                if (gameState !== 'READY' || targetObject) return;
+
+                // ランダムな家具を選択
+                const furniture = furnitureData[Math.floor(Math.random() * furnitureData.length)];
+                const gltf = preloadedModels.get(furniture.file);
+                if (!gltf) return;
+
+                // 1. お題オブジェクト(targetObject)の生成
+                targetObject = gltf.scene.clone();
+                const scaleFactor = furniture.height / new THREE.Box3().setFromObject(targetObject).getSize(new THREE.Vector3()).y;
+                
+                // ランダムな位置・回転・スケールを設定
+                targetObject.position.setFromMatrixPosition(reticle.matrix);
+                targetObject.position.x += (Math.random() - 0.5) * 0.5; // 少しずらす
+                targetObject.position.z += (Math.random() - 0.5) * 0.5;
+                targetObject.rotation.y = Math.random() * Math.PI * 2;
+                const randomScaleMultiplier = 0.75 + Math.random() * 0.5; // 0.75x ~ 1.25x
+                targetObject.scale.set(scaleFactor * randomScaleMultiplier, scaleFactor * randomScaleMultiplier, scaleFactor * randomScaleMultiplier);
+
+                // お題は半透明で青っぽくする
+                targetObject.traverse(child => {
+                    if (child.isMesh) {
+                        child.material = child.material.clone();
+                        child.material.transparent = true;
+                        child.material.opacity = 0.4;
+                        child.material.color.set(0x87CEFA); // ライトブルー
+                    }
+                });
+                scene.add(targetObject);
+
+                // 2. ユーザー操作オブジェクト(userObject)の生成
+                userObject = gltf.scene.clone();
+                setObjectTransparency(userObject, true); // 最初は半透明
+                userObject.scale.set(scaleFactor, scaleFactor, scaleFactor);
+                userObject.userData.initialScale = userObject.scale.clone();
+                userObject.userData.scaleMultiplier = 1.0;
+                userObject.visible = false;
+                scene.add(userObject);
+                placedObjects.push(userObject); // 操作対象として配列に追加
+
+                gameState = 'PLAYING';
+                updateSliderForObject(userObject);
+                updateUI();
+            }
+
+            function calculateAndShowScore() {
+                if (gameState !== 'PLAYING' || !targetObject || !userObject) return;
+
+                // 1. 位置スコア
+                const posDiff = targetObject.position.distanceTo(userObject.position);
+                const posScore = Math.max(0, 100 * (1 - posDiff / 1.0)); // 1m離れたら0点
+
+                // 2. 回転スコア (Y軸のみ)
+                const rotDiff = Math.abs(targetObject.rotation.y - userObject.rotation.y) % (2 * Math.PI);
+                const angleDiff = Math.min(rotDiff, 2 * Math.PI - rotDiff);
+                const rotScore = Math.max(0, 100 * (1 - angleDiff / Math.PI)); // 180度違ったら0点
+
+                // 3. スケールスコア
+                const scaleTarget = targetObject.scale.x;
+                const scaleUser = userObject.scale.x;
+                const scaleDiff = Math.abs(scaleTarget - scaleUser) / scaleTarget;
+                const scaleScore = Math.max(0, 100 * (1 - scaleDiff / 0.5)); // 50%大きさが違ったら0点
+
+                const totalScore = (posScore + rotScore + scaleScore) / 3;
+
+                // 結果を表示
+                document.getElementById('pos-score').textContent = `${posScore.toFixed(0)}%`;
+                document.getElementById('rot-score').textContent = `${rotScore.toFixed(0)}%`;
+                document.getElementById('scale-score').textContent = `${scaleScore.toFixed(0)}%`;
+                document.getElementById('total-score').textContent = `総合一致度: ${totalScore.toFixed(0)}%`;
+                
+                document.getElementById('score-modal').style.display = 'flex';
+                gameState = 'SCORED';
+                updateUI();
+            }
+
+            // ▲▲▲ ゲームロジックの関数群 ▲▲▲
+
+            function setupUI() {
+                // 決定ボタンは「採点する」に
+                document.getElementById('confirm-button').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    calculateAndShowScore();
+                });
+                
+                // スコアモーダルのボタン設定
+                document.getElementById('retry-button').addEventListener('click', () => {
+                     resetGame();
+                     initializeARExperience();
+                });
+                document.getElementById('exit-game-button').addEventListener('click', endSession);
+                
+                document.getElementById('exit-ar-button').addEventListener('click', (e) => { e.stopPropagation(); endSession(); });
+                function endSession() {
+                    const currentSession = renderer.xr.getSession();
+                    if (currentSession) currentSession.end();
+                }
+
+                // スライダーや回転ボタンのセットアップ（内容はほぼ変更なし）
+                const rotateLeftButton = document.getElementById('rotate-left-button');
+                const rotateRightButton = document.getElementById('rotate-right-button');
+                setupRotationButtonEvents(rotateLeftButton, 1);
+                setupRotationButtonEvents(rotateRightButton, -1);
+                
+                const scaleSliderContainer = document.getElementById('scale-slider-container');
+                const sliderTrack = document.getElementById('slider-track');
+                const sliderHandle = document.getElementById('slider-handle');
+                let isDraggingSlider = false;
+                const onSliderDragStart = (e) => { e.stopPropagation(); isDraggingSlider = true; };
+                const onSliderDragEnd = () => isDraggingSlider = false;
+                const onSliderDragMove = (event) => {
+                    if (!isDraggingSlider || gameState !== 'PLAYING') return;
+                    event.preventDefault();
+                    const clientX = event.clientX || event.touches[0].clientX;
+                    const rect = sliderTrack.getBoundingClientRect();
+                    let percent = (clientX - rect.left) / rect.width;
+                    percent = Math.max(0, Math.min(1, percent));
+                    updateScaleFromSlider(percent);
+                };
+                sliderHandle.addEventListener('mousedown', onSliderDragStart);
+                document.addEventListener('mousemove', onSliderDragMove);
+                document.addEventListener('mouseup', onSliderDragEnd);
+                sliderHandle.addEventListener('touchstart', onSliderDragStart, { passive: false });
+                document.addEventListener('touchmove', onSliderDragMove, { passive: false });
+                document.addEventListener('touchend', onSliderDragEnd);
+            }
+            
+            // 操作系の関数は userObject を対象にする
+            function handleTouchStart(event) {
+                if (event.target !== event.currentTarget || gameState !== 'PLAYING') return;
+                event.preventDefault();
+                gestureState.touchCount = event.touches.length;
+                if (!userObject) return;
+
+                gestureState.isInteracting = true;
+                if (gestureState.touchCount === 1) {
+                    gestureState.lastX = event.touches[0].clientX;
+                } else if (gestureState.touchCount >= 2) {
+                    gestureState.initialDistance = getDistance(event.touches);
+                    gestureState.originalMultiplier = userObject.userData.scaleMultiplier || 1.0;
+                }
+            }
+
+            function handleTouchMove(event) {
+                if (event.target !== event.currentTarget || !gestureState.isInteracting || gameState !== 'PLAYING' || !userObject) return;
+                event.preventDefault();
+
+                if (gestureState.touchCount === 1 && event.touches.length === 1) {
+                    const currentX = event.touches[0].clientX;
+                    const deltaX = currentX - gestureState.lastX;
+                    userObject.rotation.y += deltaX * 0.01;
+                    gestureState.lastX = currentX;
+                } else if (gestureState.touchCount >= 2 && event.touches.length >= 2) {
+                    if (gestureState.initialDistance === 0) return;
+                    const currentDistance = getDistance(event.touches);
+                    const scaleRatio = currentDistance / gestureState.initialDistance;
+                    let newMultiplier = gestureState.originalMultiplier * scaleRatio;
+                    newMultiplier = Math.max(0.5, Math.min(2.0, newMultiplier));
+                    userObject.scale.copy(userObject.userData.initialScale).multiplyScalar(newMultiplier);
+                    userObject.userData.scaleMultiplier = newMultiplier;
+                    const percent = (newMultiplier - 0.5) / 1.5;
+                    updateSliderHandlePosition(percent);
+                }
+            }
+            
+            function handleTouchEnd(event) {
+                if (event.target !== event.currentTarget) return;
+                if (event.touches.length === 0) {
+                    gestureState.isInteracting = false;
+                }
+                if (event.touches.length > 0 && event.touches.length !== gestureState.touchCount) {
+                    handleTouchStart(event); // 指の数が変わったらリセット
+                }
+                gestureState.touchCount = event.touches.length;
+            }
+
+
+            function updateUI() {
+                const transformControls = document.getElementById('transform-controls');
+                const decisionControls = document.getElementById('decision-controls');
+                
+                document.getElementById('exit-ar-button').style.display = renderer.xr.isPresenting ? 'flex' : 'none';
+
+                transformControls.style.display = 'none';
+                decisionControls.style.display = 'none';
+
+                switch (gameState) {
+                    case 'IDLE':
+                    case 'READY':
+                        // ゲーム開始前は何も表示しない
+                        break;
+                    case 'PLAYING':
+                        transformControls.style.display = 'flex';
+                        decisionControls.style.display = 'flex';
+                        break;
+                    case 'SCORED':
+                        // スコア表示中も操作UIは非表示
+                        break;
+                }
+            }
+
+            function animate() {
+                renderer.setAnimationLoop(render);
+            }
+
+            function render() {
+                if (!renderer.xr.isPresenting) return;
+                
+                if (isRotatingContinuously && gameState === 'PLAYING' && userObject) {
+                    userObject.rotation.y += 0.04 * continuousRotationDirection;
+                }
+                
+                const instructionText = document.getElementById('instruction-text');
+                const frame = renderer.xr.getFrame();
+                if (frame) {
+                    const referenceSpace = renderer.xr.getReferenceSpace();
+                    if (hitTestSource) {
+                        const hitTestResults = frame.getHitTestResults(hitTestSource);
+                        if (hitTestResults.length > 0) {
+                            const hit = hitTestResults[0];
+                            const hitPose = hit.getPose(referenceSpace);
+                            if (floorY === null) floorY = hitPose.transform.position.y;
+                            
+                            reticle.matrix.fromArray(hitPose.transform.matrix);
+                            reticle.visible = true;
+                            
+                            if (instructionText.style.display !== 'none') {
+                                instructionText.style.display = 'none';
+                                stopDotAnimation();
+                            }
+                            
+                            // 床認識後、お題とユーザーモデルを配置
+                            if (gameState === 'READY') {
+                                spawnTargetAndUserObjects();
+                            }
+                            
+                            // ユーザーオブジェクトをレティクルに追従させる
+                            if (userObject && gameState === 'PLAYING' && !gestureState.isInteracting && !isRotatingContinuously) {
+                                userObject.position.setFromMatrixPosition(reticle.matrix);
+                                userObject.visible = true;
+                            }
+                        } else {
+                            reticle.visible = false;
+                        }
+                    } else if (instructionText.style.display !== 'block' && gameState === 'READY') {
+                        instructionText.style.display = 'block';
+                        startDotAnimation();
+                    }
+                }
+                
+                if (!hitTestSourceRequested && renderer.xr.getSession()) {
+                    const session = renderer.xr.getSession();
+                    session.requestReferenceSpace('viewer').then((referenceSpace) => {
+                        session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                            hitTestSource = source;
+                        });
+                    });
+                    session.addEventListener('end', () => {
+                        hitTestSourceRequested = false; hitTestSource = null;
+                    });
+                    hitTestSourceRequested = true;
+                }
+                
+                renderer.render(scene, camera);
+            }
+            
+            // 以下は、元のコードから流用するヘルパー関数群です
+            // (getDistance, setupRotationButtonEvents, updateSliderForObject, etc.)
+            function getDistance(touches) { const dx = touches[0].clientX - touches[1].clientX; const dy = touches[0].clientY - touches[1].clientY; return Math.sqrt(dx * dx + dy * dy); }
+            function setupRotationButtonEvents(button, direction) { let pressTimer = null; const pressStart = (e) => { e.preventDefault(); pressTimer = setTimeout(() => { isRotatingContinuously = true; continuousRotationDirection = direction; }, 300); }; const pressEnd = () => { clearTimeout(pressTimer); if (!isRotatingContinuously) { if (userObject) userObject.rotation.y += (Math.PI / 4) * direction; } isRotatingContinuously = false; }; button.addEventListener('mousedown', pressStart); button.addEventListener('touchstart', pressStart, { passive: false }); button.addEventListener('mouseup', pressEnd); button.addEventListener('touchend', pressEnd); button.addEventListener('mouseleave', pressEnd); }
+            function updateSliderForObject(object) { if (!object) return; const multiplier = object.userData.scaleMultiplier || 1.0; const percent = (multiplier - 0.5) / 1.5; updateSliderHandlePosition(percent); }
+            function updateSliderHandlePosition(percent) { const sliderHandle = document.getElementById('slider-handle'); const handleWidth = sliderHandle.offsetWidth; sliderHandle.style.left = `calc(${percent * 100}% - ${handleWidth * percent}px)`; const scale = 0.8 + 0.4 * percent; sliderHandle.style.transform = `translateY(-50%) scale(${scale})`; }
+            function updateScaleFromSlider(percent) { if (!userObject) return; const multiplier = 0.5 + percent * 1.5; userObject.userData.scaleMultiplier = multiplier; userObject.scale.copy(userObject.userData.initialScale).multiplyScalar(multiplier); updateSliderHandlePosition(percent); }
+            function setObjectTransparency(object, isTransparent, opacity = 0.7) { if (!object) return; object.traverse(child => { if (child.isMesh) { if (!child.material.cloned) { child.material = child.material.clone(); child.material.cloned = true; } child.material.transparent = true; child.material.opacity = isTransparent ? opacity : 1.0; } }); }
+            function startDotAnimation() { if (dotAnimationTimer) return; const dotsElement = document.getElementById('loading-dots'); if (!dotsElement) return; let dotCount = 0; const dots = ['・', '・・', '・・・']; dotAnimationTimer = setInterval(() => { dotsElement.textContent = dots[dotCount % dots.length]; dotCount++; }, 400); }
+            function stopDotAnimation() { if (dotAnimationTimer) { clearInterval(dotAnimationTimer); dotAnimationTimer = null; } }
+        }
+
+        main();
+    </script>
+</body>
+</html>
